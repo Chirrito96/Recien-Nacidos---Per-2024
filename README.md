@@ -55,14 +55,16 @@ https://huggingface.co/spaces/C2MV/RECIEN_NACIDOS_PERU_2024
 
 https://www.researchgate.net/publication/383823774_Recien_Nacidos_Peru_2024
 
+
+
 📩 Contactos:
 •	Crhistian Montenegro:
-  https://www.linkedin.com/in/crhistian-mark-montenegro-valderrama-175213221/
-  https://x.com/c2mv96
+- https://www.linkedin.com/in/crhistian-mark-montenegro-valderrama-175213221/
+- https://x.com/c2mv96
 
 •	Renato Rojas:
-  https://www.linkedin.com/in/renato-rojas-dominguez-222808229/
-  https://x.com/Renato94385927
+- https://www.linkedin.com/in/renato-rojas-dominguez-222808229/
+- https://x.com/Renato94385927
 
   
 ¡Acompáñanos en este viaje por la ciencia y la salud pública! 
