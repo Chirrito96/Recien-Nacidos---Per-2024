@@ -10,8 +10,11 @@ Este estudio se alinea con el Objetivo de Desarrollo Sostenible 3, que busca gar
 🤯 Luego, usamos GPTs e IA para crear un dashboard interactivo con chatbot en HuggingFace.
 
 ¡Transformamos datos en soluciones reales! 🔥👨‍💻
+
 https://www.gob.pe/expresateperu2024
+
 https://www.facebook.com/PeruPaisDigital
+
 https://www.facebook.com/sisperuoficial
 
 👥 Equipo de Investigación:
@@ -34,22 +37,32 @@ https://www.facebook.com/sisperuoficial
 
 📂 Descubre más sobre nuestro trabajo aquí:
 •	Dataset:
+
 https://expresateperu.datosabiertos.gob.pe/dataset/consumo-de-medicamentos-en-reci%C3%A9n-nacidos-asegurados-al-seguro-integral-de-salud
+
+
 •	GitHub:
+
 https://github.com/Chirrito96/Recien-Nacidos-Peru2024
+
+
 •	HuggingFace (DashBoard + ChatBot):
+
 https://huggingface.co/spaces/C2MV/RECIEN_NACIDOS_PERU_2024
+
+
 •	ResearchGate:
+
 https://www.researchgate.net/publication/383823774_Recien_Nacidos_Peru_2024
 
 📩 Contactos:
 •	Crhistian Montenegro:
-  o	https://www.linkedin.com/in/crhistian-mark-montenegro-valderrama-175213221/
-  o	https://x.com/c2mv96
+  https://www.linkedin.com/in/crhistian-mark-montenegro-valderrama-175213221/
+  https://x.com/c2mv96
 
-•	Renato Rojas: 
-  o	https://www.linkedin.com/in/renato-rojas-dominguez-222808229/
-  o	https://x.com/Renato94385927
+•	Renato Rojas:
+  https://www.linkedin.com/in/renato-rojas-dominguez-222808229/
+  https://x.com/Renato94385927
 
   
 ¡Acompáñanos en este viaje por la ciencia y la salud pública! 
