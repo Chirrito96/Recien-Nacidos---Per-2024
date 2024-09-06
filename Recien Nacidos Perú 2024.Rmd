@@ -1,0 +1,1209 @@
+---
+title: "Administración de Medicamentos a Recién Nacidos"
+author: "Renato Jair Rojas Dominguez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: cerulean
+    toc: true
+    toc_float: true
+lang: "es-ES"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	fig.align = "center",
+  fig.width = 10,
+	fig.height = 10
+)
+```
+
+# 1. Introducción:
+
+Análisis de la Administración de Medicamentos en Recién Nacidos: Un Estudio de Datos de Instituciones de Salud Pública en Perú.
+
+Este proyecto de análisis de datos se centra en el estudio de un extenso dataset relacionado con la administración de medicamentos a recién nacidos en diversas instituciones de salud pública en Perú. El propósito del análisis es explorar y comprender los patrones de administración de medicamentos, los diagnósticos asociados y otros factores relevantes en el cuidado neonatal.
+
+El dataset, denominado "Medicamentos", contiene un total de 1,240,605 registros y 27 columnas.
+
+# 2. Resúmen:
+
+Hacer resúmen
+
+# 3. Objetivo:
+
+Explica brevemente el propósito del análisis (por ejemplo, entender los patrones de administración de medicamentos y su relación con los diagnósticos neonatales).
+
+# 4. Metodología:
+
+Menciona las técnicas de análisis y las herramientas utilizadas.
+
+## 4.1. Obtención de los datos
+
+Los datos fueron obtenidos de la "Plataforma Nacional de Datos Abiertos" <https://www.datosabiertos.gob.pe/> en la categoría Salud con el nombre "**Consumo de medicamentos en recién nacidos asegurados al Seguro Integral de Salud - [SIS]"** <https://www.datosabiertos.gob.pe/dataset/consumo-de-medicamentos-en-reci%C3%A9n-nacidos-asegurados-al-seguro-integral-de-salud-sis>
+
+## 4.2. Limpieza y preparación de datos
+
+```{r Librerías}
+library(tidyverse)
+library(readr)
+library(data.table)
+library(geodata)
+library(sf)
+```
+
+Medicamentos_raw \<- read_csv("Medicamentos_Recien_Nacidos_SIS.csv", locale = locale(encoding = "UTF-8"))
+
+## 4.3. Formato de dataset
+
+El código convierte las columnas de texto del dataset `Medicamentos_raw` de la codificación **Latin-1** a **UTF-8**. Esta conversión es crucial para corregir problemas con tildes y otros caracteres especiales, garantizando que toda la información textual (como nombres de medicamentos y localidades) se visualice correctamente. Esto asegura la integridad de los datos antes de llevar a cabo análisis más avanzados, evitando errores en la interpretación y presentación de los resultados.
+
+Medicamentos_raw \<- read_csv("Medicamentos_Recien_Nacidos_SIS.csv", locale = locale(encoding = "UTF-8"))
+
+Conversión de tipos de datos Una vez corregida la codificación de los caracteres, se procedió a convertir los tipos de variables en el dataset para asegurar que cada columna tuviera el formato más adecuado para el análisis.
+
+Medicamentos_raw \<- Medicamentos_raw %\>% mutate( \# Convertir las fechas a tipo Date FECHA_CORTE = as.Date(as.character(FECHA_CORTE), format = "%Y%m%d"), FECATENCION = as.Date(as.character(FECATENCION), format = "%Y%m%d"), FECINGHOSP = as.Date(as.character(FECINGHOSP), format = "%Y%m%d"), FECALTAHOSP = as.Date(as.character(FECALTAHOSP), format = "%Y%m%d"), \# Convertir variables de texto a factor SEXO = as.factor(SEXO), DEPARTAMENTO = as.factor(DEPARTAMENTO), PROVINCIA = as.factor(PROVINCIA), DISTRITO = as.factor(DISTRITO), UBIGEO = as.factor(UBIGEO), NIVEL_EESS = as.factor(NIVEL_EESS), RENIPRESS = as.factor(RENIPRESS), NOMBRE_EESS = as.factor(NOMBRE_EESS), COD_SERVICIO = as.factor(COD_SERVICIO), SERVICIO = as.factor(SERVICIO), CODDIA = as.factor(CODDIA), C10_NOMBRE = as.factor(C10_NOMBRE), COD_MEDICAMENTO = as.factor(COD_MEDICAMENTO), NOMBRE_MEDICAMENTO = as.factor(NOMBRE_MEDICAMENTO), PRESENTACION = as.factor(PRESENTACION), FORMA_FARMACEUTICA = as.factor(FORMA_FARMACEUTICA), \# Variables numéricas EDAD_DIAS = as.integer(EDAD_DIAS), PESO = as.numeric(PESO), DIAS_HOSP = as.integer(DIAS_HOSP), CANTIDAD = as.integer(CANTIDAD), VALOR_BRUTO = as.numeric(VALOR_BRUTO), VALOR_NETO = as.numeric(VALOR_NETO), \# Variables carácter CODIGO_ANONIMIZADO = as.character(CODIGO_ANONIMIZADO), )
+
+## 4.4. Limpieza de columnas
+
+Limpieza del código ubigeo dentro de los datos en las columnas DEPARTAMENTO, PROVINCIA y DISTRITO
+
+Medicamentos_raw \<- Medicamentos_raw %\>% mutate( DEPARTAMENTO = factor(sub("\^\\d+\\s+", "", as.factor(DEPARTAMENTO))), PROVINCIA = factor(sub("\^\\d+\\s+", "", as.factor(PROVINCIA))), DISTRITO = factor(sub("\^\\d+\\s+", "", as.factor(DISTRITO))) )
+
+## 4.5. Exportar dataset en CSV codificado UTF-8
+
+Con el fin de tener el csv limpio y con el formato correcto para ser limpiaso y procesado.
+
+fwrite(Medicamentos_raw, "Medicamentos.csv", bom = TRUE)
+
+## 4.6. Importar dataset de trabajo
+
+Éste dataset es el que será limpiado y utilizado para el análisis
+
+Medicamentos \<- read_csv("Medicamentos.csv", \# Mantiene UBIGEO locale = locale(encoding = "UTF-8")) \# Falta dar formato de tíldes
+
+## 4.7. Conteo de valores NA
+
+Se cuenta la cantidad de valores NA por cada variable para comenzar a procesarlos.
+
+Contar los valores NA por columna
+
+na_count \<- sapply(Medicamentos, function(x) sum(is.na(x)))
+
+Calcular el porcentaje de valores NA por columna
+
+na_percentage \<- (na_count / nrow(Medicamentos)) \* 100
+
+Filtrar solo las columnas con valores faltantes
+
+na_columns \<- na_count[na_count \> 0] na_percentage_filtered \<- na_percentage[na_percentage \> 0]
+
+Mostrar el número de NA por variable
+
+for (col_name in names(na_columns)) { cat("Columna:", col_name, "- Número de valores faltantes:", na_columns[col_name], "\n") }
+
+Mostrar el porcentaje de NA por variable
+
+for (col_name in names(na_percentage_filtered)) { cat("Columna:", col_name, "- Porcentaje de valores faltantes:", round(na_percentage_filtered[col_name], 2), "%\n") }
+
+## 4.8. Manejo de NA en variable PESO
+
+Se determina que los valores de CODDIA,SEXO, COD_MEDICAMENTO y COD_SERVICIO cómo valores importantes para determinar el peso de los Recién Nacidos.
+
+Se imputa los valores NA de la variable PESO mediante mediana por CODDIA, COD_MEDICAMENTO y COD_SERVICIO, PESO y COD_SERVICIO, SEXO y COD_SERVICIO
+
+\# Calcular la mediana de PESO por CODDIA, COD_MEDICAMENTO y COD_SERVICIO
+
+\# Calcular la mediana de PESO por CODDIA, COD_MEDICAMENTO y COD_SERVICIO
+
+mediana_peso_por_grupo \<- Medicamentos[, .(PESO_MEDIANA = median(PESO, na.rm = TRUE)), by = .(CODDIA, COD_MEDICAMENTO, COD_SERVICIO)]
+
+\# Imputar los valores NA en PESO con la mediana correspondiente
+
+Medicamentos[is.na(PESO), PESO := mediana_peso_por_grupo[.SD, PESO_MEDIANA, on = .(CODDIA, COD_MEDICAMENTO, COD_SERVICIO)]]
+
+\# Imputar los valores NA restantes con la mediana dentro de grupos más amplios
+
+mediana_peso_por_grupo_amplio \<- Medicamentos[, .(PESO_MEDIANA = median(PESO, na.rm = TRUE)), by = CODDIA] Medicamentos[is.na(PESO), PESO := mediana_peso_por_grupo_amplio[.SD, PESO_MEDIANA, on = .(CODDIA)]]
+
+\# Calcular la mediana de PESO por SEXO y COD_SERVICIO
+
+mediana_peso_por_sexo_servicio \<- Medicamentos[, .(PESO_MEDIANA = median(PESO, na.rm = TRUE)), by = .(SEXO, COD_SERVICIO)]
+
+\# Imputar los valores NA restantes en PESO con la mediana correspondiente a la combinación de SEXO y COD_SERVICIO
+
+Medicamentos[is.na(PESO), PESO := mediana_peso_por_sexo_servicio[.SD, PESO_MEDIANA, on = .(SEXO, COD_SERVICIO)]]
+
+\# Verificar si quedan valores NA en PESO
+
+na_peso_despues \<- sum(is.na(Medicamentos\$PESO)) cat("Cantidad de valores NA en PESO después de la imputación:", na_peso_despues, "\n")
+
+## 4.9. Manejo de NA en variables FECINGHOSP, FECALTAHOSP Y DIAS_HOSP
+
+Se calcula los dias hospitalizados mediante la diferencia de la fecha de alta y fecha de ingreso de hospitalización, para las siguientes valores NA se imputó mediante CODDIA, SEXO y EDAD_DIAS
+
+\# Calcular Dias Hospitalizados
+
+Medicamentos \<- Medicamentos %\>% mutate( DIAS_HOSP = ifelse( is.na(DIAS_HOSP), as.integer(as.Date(FECALTAHOSP) - as.Date(FECINGHOSP)), DIAS_HOSP) )
+
+\# Imputación de Dias Hospitalizados por CODDIA, SEXO y EDAD_DIAS
+
+Medicamentos \<- Medicamentos %\>% group_by(CODDIA, SEXO, EDAD_DIAS) %\>% mutate(DIAS_HOSP = ifelse(is.na(DIAS_HOSP), as.integer(median(DIAS_HOSP, na.rm = TRUE)), DIAS_HOSP)) %\>% ungroup()
+
+\# Calcular la mediana de DIAS_HOSP por CODDIA y SEXO
+
+Medicamentos \<- Medicamentos %\>% group_by(CODDIA, SEXO) %\>% mutate(DIAS_HOSP = ifelse(is.na(DIAS_HOSP), as.integer(median(DIAS_HOSP, na.rm = TRUE)), DIAS_HOSP)) %\>% ungroup()
+
+\# Calcular la mediana de DIAS_HOSP por SEXO y EDAD_DIAS Medicamentos \<- Medicamentos %\>% group_by(SEXO, EDAD_DIAS) %\>% mutate(DIAS_HOSP = ifelse(is.na(DIAS_HOSP), as.integer(median(DIAS_HOSP, na.rm = TRUE)), DIAS_HOSP)) %\>% ungroup()
+
+\# Calcular Fecha de ingreo de hospitalización
+
+Medicamentos \<- Medicamentos %\>% mutate( FECINGHOSP = as.Date(ifelse(is.na(FECINGHOSP) & !is.na(FECALTAHOSP) & !is.na(DIAS_HOSP), as.Date(FECALTAHOSP) - DIAS_HOSP, FECINGHOSP), origin = "1970-01-01"))
+
+\# Imputar los valores NA en FECALTAHOSP con FECATENCION
+
+Medicamentos$FECALTAHOSP[is.na(Medicamentos$FECALTAHOSP)] \<- Medicamentos$FECATENCION[is.na(Medicamentos$FECALTAHOSP)]
+
+\# Calcular Dias Hospitalizados
+
+Medicamentos \<- Medicamentos %\>% mutate( DIAS_HOSP = ifelse( is.na(DIAS_HOSP), as.integer(as.Date(FECALTAHOSP) - as.Date(FECINGHOSP)), DIAS_HOSP) )
+
+\# Verificar la cantidad de valores NA en DIAS_HOSP, FECINGHOSP y FECALTAHOSP
+
+na_dias_hosp_despues \<- sum(is.na(Medicamentos\$DIAS_HOSP))
+
+na_fecinghosp_despues \<- sum(is.na(Medicamentos\$FECINGHOSP))
+
+na_fecaltahosp_despues \<- sum(is.na(Medicamentos\$FECALTAHOSP))
+
+\# Mostrar los resultados
+
+## 4.10. Manejo de NA en variable PRESENTACION
+
+Se imputo mediante la moda por medio del código de medicamento y forma farmaceutica.
+
+\# Convertir PRESENTACION a character temporalmente
+
+Medicamentos \<- Medicamentos %\>% mutate(PRESENTACION = as.character(PRESENTACION))
+
+\# Imputar por la moda dentro de cada grupo definido por COD_MEDICAMENTO y FORMA_FARMACEUTICA
+
+Medicamentos \<- Medicamentos %\>% group_by(COD_MEDICAMENTO, FORMA_FARMACEUTICA) %\>% mutate(PRESENTACION = ifelse(is.na(PRESENTACION), ifelse(sum(!is.na(PRESENTACION)) \> 0, names(sort(table(PRESENTACION), decreasing = TRUE))[1], NA), PRESENTACION)) %\>% ungroup()
+
+\# Para los valores que aún sean NA, reemplazarlos con la moda global
+
+moda_global \<- names(sort(table(Medicamentos$PRESENTACION), decreasing = TRUE))[1]
+Medicamentos$PRESENTACION[is.na(Medicamentos\$PRESENTACION)] \<- moda_global
+
+\# Convertir PRESENTACION de vuelta a factor
+
+Medicamentos$PRESENTACION <- factor(Medicamentos$PRESENTACION)
+
+## 4.11. Imputación de outliers de Peso por Género
+
+Se imputaron valores outliers ya que habían datos de peso registrados en 0kg y 10 kg mediante medianas.
+
+\# Calcular los cuartiles y el IQR por género
+
+cuartiles_masculino \<- quantile(Medicamentos$PESO[Medicamentos$SEXO == "MASCULINO"], probs = c(0.25, 0.75), na.rm = TRUE) IQR_masculino \<- cuartiles_masculino[2] - cuartiles_masculino[1] limite_inferior_masculino \<- cuartiles_masculino[1] - 1.5 \* IQR_masculino limite_superior_masculino \<- cuartiles_masculino[2] + 1.5 \* IQR_masculino cuartiles_femenino \<- quantile(Medicamentos$PESO[Medicamentos$SEXO == "FEMENINO"], probs = c(0.25, 0.75), na.rm = TRUE) IQR_femenino \<- cuartiles_femenino[2] - cuartiles_femenino[1] limite_inferior_femenino \<- cuartiles_femenino[1] - 1.5 \* IQR_femenino limite_superior_femenino \<- cuartiles_femenino[2] + 1.5 \* IQR_femenino
+
+\# Calcular la mediana de PESO por género
+
+mediana_peso_masculino \<- median(Medicamentos$PESO[Medicamentos$SEXO == "MASCULINO"], na.rm = TRUE) mediana_peso_femenino \<- median(Medicamentos$PESO[Medicamentos$SEXO == "FEMENINO"], na.rm = TRUE) \# Imputar los outliers con la mediana correspondiente al género Medicamentos$PESO[Medicamentos$SEXO == "MASCULINO" & (Medicamentos$PESO < limite_inferior_masculino | Medicamentos$PESO \> limite_superior_masculino)] \<- mediana_peso_masculino Medicamentos$PESO[Medicamentos$SEXO == "FEMENINO" & (Medicamentos$PESO < limite_inferior_femenino | Medicamentos$PESO \> limite_superior_femenino)] \<- mediana_peso_femenino
+
+\# Verificación de la imputación
+
+outliers_masculino \<- sum(Medicamentos$SEXO == "MASCULINO" & (Medicamentos$PESO \< limite_inferior_masculino \| Medicamentos
+
+$PESO > limite_superior_masculino))
+outliers_femenino <- sum(Medicamentos$SEXO == "FEMENINO" & (Medicamentos$PESO < limite_inferior_femenino | Medicamentos$PESO \> limite_superior_femenino))
+
+cat("Cantidad de outliers restantes en MASCULINO después de la imputación:", outliers_masculino, "\n")
+
+cat("Cantidad de outliers restantes en FEMENINO después de la imputación:", outliers_femenino, "\n")
+
+## 4.12 Imputación de outliers CANTIDAD, VALOR_BRUTO, VALOR_NETO y NIVEL_EESS
+
+Se imputaron valores outliers ya que habían datos con números que superaban los miles mediante medianas.
+
+NIVEL_EESS presentó un valor 0 por lo que se imputó cómo nivel 2.
+
+\# Imputar outliers en CANTIDAD con la mediana
+
+Medicamentos$CANTIDAD[Medicamentos$CANTIDAD \< quantile(Medicamentos$CANTIDAD, 0.05) | Medicamentos$CANTIDAD \> quantile(Medicamentos$CANTIDAD, 0.95)] <- median(Medicamentos$CANTIDAD, na.rm = TRUE)
+
+\# Imputar outliers en VALOR_BRUTO con la mediana
+
+Medicamentos$VALOR_BRUTO[Medicamentos$VALOR_BRUTO \< quantile(Medicamentos$VALOR_BRUTO, 0.05) | Medicamentos$VALOR_BRUTO \> quantile(Medicamentos$VALOR_BRUTO, 0.95)] <- median(Medicamentos$VALOR_BRUTO, na.rm = TRUE)
+
+\# Imputar outliers en VALOR_NETO con la mediana
+
+Medicamentos$VALOR_NETO[Medicamentos$VALOR_NETO \< quantile(Medicamentos$VALOR_NETO, 0.05) | Medicamentos$VALOR_NETO \> quantile(Medicamentos$VALOR_NETO, 0.95)] <- median(Medicamentos$VALOR_NETO, na.rm = TRUE)
+
+\# Reemplazar Valores 0 por 1 en la Variable NIVEL_EESS
+
+Medicamentos \<- Medicamentos %\>% mutate( NIVEL_EESS = ifelse(NIVEL_EESS == 0, 2, NIVEL_EESS) )
+
+## 4.13. Exportar el dataset limpio cómo archivo CSV con la codificación UTF-8
+
+Dataset limpio es exportado para su análisis.
+
+fwrite(Medicamentos, "Medicamentos.csv", bom = TRUE)
+
+# 5. Análisis Exploratorio de Datos (EDA)
+
+Se realizó un análisis descriptivo de cada variable conocer el comportamiento de los datos en cada uno de ellas.
+
+```{r}
+# Importar dataset limpia
+Medicamentos <- read_csv("Medicamentos.csv", # Mantiene UBIGEO
+                         locale = locale(encoding = "UTF-8")) # Falta dar formato de tíldes
+
+# Convertir los tipos de variables después de la corrección de codificación
+Medicamentos <- Medicamentos %>%
+  mutate(
+    # Convertir las fechas a tipo Date
+    #    FECHA_CORTE = as.Date(as.character(FECHA_CORTE), format = "%Y%m%d"),
+    #    FECATENCION = as.Date(as.character(FECATENCION), format = "%Y%m%d"),
+    #    FECINGHOSP = as.Date(as.character(FECINGHOSP), format = "%Y%m%d"),
+    #    FECALTAHOSP = as.Date(as.character(FECALTAHOSP), format = "%Y%m%d"),
+    # Convertir variables de texto a factor
+    SEXO = as.factor(SEXO),
+    DEPARTAMENTO = as.factor(DEPARTAMENTO),
+    PROVINCIA = as.factor(PROVINCIA),
+    DISTRITO = as.factor(DISTRITO),
+    UBIGEO = as.factor(UBIGEO),
+    NIVEL_EESS = as.factor(NIVEL_EESS),
+    RENIPRESS = as.factor(RENIPRESS),
+    NOMBRE_EESS = as.factor(NOMBRE_EESS),
+    COD_SERVICIO = as.factor(COD_SERVICIO),
+    SERVICIO = as.factor(SERVICIO),
+    CODDIA = as.factor(CODDIA),
+    C10_NOMBRE = as.factor(C10_NOMBRE),
+    COD_MEDICAMENTO = as.factor(COD_MEDICAMENTO),
+    NOMBRE_MEDICAMENTO = as.factor(NOMBRE_MEDICAMENTO),
+    PRESENTACION = as.factor(PRESENTACION),
+    FORMA_FARMACEUTICA = as.factor(FORMA_FARMACEUTICA),
+    # Variables numéricas
+    EDAD_DIAS = as.integer(EDAD_DIAS),
+    PESO = as.numeric(PESO),
+    DIAS_HOSP = as.integer(DIAS_HOSP),
+    CANTIDAD = as.integer(CANTIDAD),
+    VALOR_BRUTO = as.numeric(VALOR_BRUTO),
+    VALOR_NETO = as.numeric(VALOR_NETO),
+    # Variables carácter
+    CODIGO_ANONIMIZADO = as.character(CODIGO_ANONIMIZADO),
+  )
+```
+
+## 5.1. FECHA_CORTE
+
+La generación del dataset fué el 26 abril del 2024
+
+## 5.2. CODIGO_ANONIZADO
+
+Identificador Anonimizado del Paciente
+
+Se realizó un análisis de la frecuencia de los códigos anonimizados en el dataset para identificar los más comunes. Los resultados muestran que los 10 códigos más frecuentes se repiten entre 52 y 75 veces. Estos códigos representan diferentes pacientes en el conjunto de datos y su frecuencia puede estar relacionada con múltiples visitas o tratamientos registrados para los mismos individuos. La visualización presentada muestra un gráfico de barras que destaca la frecuencia de aparición de estos códigos, utilizando solo los primeros 5 caracteres para facilitar la lectura y comparación.
+
+```{r}
+# Calcular la frecuencia de los códigos más comunes
+frecuencia_codigos <- Medicamentos %>%
+  group_by(CODIGO_ANONIMIZADO) %>%
+  summarise(Frecuencia = n()) %>%
+  arrange(desc(Frecuencia))
+# Seleccionar los 10 códigos más frecuentes
+top_codigos <- frecuencia_codigos %>%
+  top_n(10, Frecuencia)
+# Crear una columna con los primeros 5 caracteres de los códigos
+top_codigos <- top_codigos %>%
+  mutate(Codigo_Corto = substr(CODIGO_ANONIMIZADO, 1, 5))
+top_codigos
+# Crear el gráfico de barras
+ggplot(top_codigos, aes(x = reorder(Codigo_Corto, -Frecuencia), y = Frecuencia)) +
+  geom_bar(stat = "identity", fill = "#1f77b4") +
+  labs(title = "Frecuencia de los 10 Códigos Anónimos Más Comunes",
+       x = "Código Anónimo (Primeros 5 Caracteres)",
+       y = "Frecuencia") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5)) +  # Centrar el título
+  coord_flip()  # Para que las etiquetas sean más legibles
+```
+
+## 5.3. EDAD_DIAS
+
+Edad del paciente a la fecha de atención. La unidad de medida es días.
+
+La variable `EDAD_DIAS` proporciona información sobre la edad de los pacientes en días, desde el momento del nacimiento hasta el final del registro. El análisis estadístico revela que la edad mínima es 0 días (recién nacidos), y la máxima es 28 días, con una media de 3.9 días y una desviación estándar de 6.23 días. La mayoría de los recién nacidos en el dataset tienen entre 0 y 5 días de edad, lo que refleja un enfoque significativo en los cuidados perinatales. Para visualizar esta distribución, se presentan varios histogramas, incluyendo separaciones por sexo, departamento y nivel de centro de salud, además de diagramas de caja (boxplots) para ilustrar la dispersión y los valores extremos en los datos.
+
+```{r}
+# Resumen estadístico de la variable EDAD_DIAS
+resumen_edad_dias <- summary(Medicamentos$EDAD_DIAS)
+# Calcular la desviación estándar
+desviacion_edad_dias <- sd(Medicamentos$EDAD_DIAS, na.rm = TRUE)
+# Combinar resumen estadístico con desviación estándar
+resumen_edad_dias_con_sd <- c(resumen_edad_dias, SD = desviacion_edad_dias)
+# Mostrar el resumen estadístico con desviación estándar
+print(resumen_edad_dias_con_sd)
+# Histograma de la variable EDAD_DIAS
+ggplot(Medicamentos, aes(x = EDAD_DIAS)) +
+  geom_histogram(binwidth = 1, fill = "#1f77b4", color = "black") +
+  labs(title = "Distribución de la Edad en Días",
+       x = "Edad en Días",
+       y = "Frecuencia") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+# Histograma de EDAD_DIAS separado por SEXO
+ggplot(Medicamentos, aes(x = EDAD_DIAS, fill = SEXO)) +
+  geom_histogram(binwidth = 1, color = "black", alpha = 0.7) +
+  facet_wrap(~ SEXO) +
+  labs(title = "Distribución de la Edad en Días Separada por Sexo",
+       x = "Edad en Días",
+       y = "Frecuencia") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+# Histograma de EDAD_DIAS separado por Departamento
+ggplot(Medicamentos, aes(x = EDAD_DIAS, fill = SEXO)) +
+  geom_histogram(binwidth = 1, color = "black", alpha = 0.7) +
+  facet_wrap(~ DEPARTAMENTO) +
+  labs(title = "Distribución de la Edad en Días Separada por Departamento",
+       x = "Edad en Días",
+       y = "Frecuencia") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+# Histograma de EDAD_DIAS separado por Nivel de Centro de Salud
+ggplot(Medicamentos, aes(x = EDAD_DIAS, fill = SEXO)) +
+  geom_histogram(binwidth = 1, color = "black", alpha = 0.7) +
+  facet_wrap(~ NIVEL_EESS) +
+  labs(title = "Distribución de la Edad en Días",
+       subtitle = "Nivel de Centro de Salud",
+       x = "Edad en Días",
+       y = "Frecuencia") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        plot.subtitle = element_text(hjust = 0.5))  # Centrar el subtítulo
+# Diagrama de caja para la variable EDAD_DIAS
+ggplot(Medicamentos, aes(y = EDAD_DIAS)) +
+  geom_boxplot(fill = "#1f77b4", color = "black") +
+  labs(title = "Diagrama de Caja de la Edad en Días",
+       y = "Edad en Días") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+# Boxplot de EDAD_DIAS separado por SEXO
+ggplot(Medicamentos, aes(x = SEXO, y = EDAD_DIAS, fill = SEXO)) +
+  geom_boxplot() +
+  labs(title = "Distribución de la Edad en Días Separada por Sexo",
+       x = "Sexo",
+       y = "Edad en Días") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+```
+
+## 5.4. FECATENCION
+
+La variable `FECATENCION` se refiere a la fecha en la que se brindó atención médica a los recién nacidos. El rango de fechas abarca desde el 1 de enero de 2022 hasta el 30 de septiembre de 2023, con la mayor concentración de atenciones ocurriendo entre mayo de 2022 y abril de 2023. El análisis muestra una distribución uniforme de registros a lo largo del tiempo, con una ligera concentración en ciertos períodos. Se incluyen visualizaciones que muestran la cantidad de registros por año, así como una serie de tiempo que ilustra la evolución de los registros diarios, destacando las fechas de corte con líneas punteadas para un análisis temporal más profundo.
+
+```{r}
+# Resumen estadístico de la variable FECATENCION
+resumen_fecatencion <- summary(Medicamentos$FECATENCION)
+# Mostrar el resumen estadístico
+print(resumen_fecatencion)
+# Contar la cantidad de registros por año
+registros_por_año <- Medicamentos %>%
+  mutate(Year = year(FECATENCION)) %>%
+  group_by(Year) %>%
+  summarise(Count = n()) %>%
+  arrange(Year)
+# Gráfico de barras para la cantidad de registros por año
+ggplot(registros_por_año, aes(x = factor(Year), y = Count)) +
+  geom_bar(stat = "identity", fill = "lightgreen", color = "black") +
+  labs(title = "Cantidad de Registros por Año",
+       x = "Año",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+# Contar el número de registros por fecha de atención
+registros_por_fecha <- Medicamentos %>%
+  group_by(FECATENCION) %>%
+  summarise(Conteo = n()) %>%
+  arrange(FECATENCION)
+# Crear el gráfico de serie de tiempo
+ggplot(registros_por_fecha, aes(x = FECATENCION, y = Conteo)) +
+  geom_line(color = "blue") +
+  labs(title = "Distribución de Registros a lo Largo del Tiempo",
+       x = "Fecha de Atención",
+       y = "Número de Registros") +
+  geom_vline(xintercept = as.numeric(as.Date(unique(Medicamentos$FECHA_CORTE))), 
+             linetype = "dashed", color = "red", 
+             label = "Fecha de Corte") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+```
+
+## 5.5. SEXO
+
+La variable `SEXO` categoriza a los pacientes en femenino y masculino. El análisis de esta variable revela que hay una ligera predominancia de pacientes masculinos (651,827 registros) en comparación con los femeninos (588,778 registros). Este patrón puede ser relevante para entender las dinámicas de género en la atención médica neonatal en el contexto estudiado. El gráfico de barras asociado muestra la distribución de los registros por sexo, utilizando colores diferenciados (rosado para femenino y azul para masculino) para facilitar la comparación visual.La variable `PESO` refleja el peso de los recién nacidos al nacer, con un rango que va desde 1.75 kg hasta 4.55 kg. El peso promedio de los recién nacidos es de aproximadamente 3.13 kg, con una desviación estándar de 0.496 kg, lo que indica una dispersión relativamente estrecha en torno a la media. Esta información es crucial para evaluar el estado de salud general de los recién nacidos, ya que el peso al nacer es un indicador clave de bienestar neonatal. Se presentan histogramas para visualizar la distribución del peso por género, así como diagramas de caja (boxplots) que muestran la variabilidad y posibles valores atípicos en los datos.
+
+```{r}
+# Calcular el resumen estadístico de la variable PESO
+resumen_peso <- Medicamentos %>%
+  summarise(
+    Min = min(PESO, na.rm = TRUE),
+    `1er Q` = quantile(PESO, 0.25, na.rm = TRUE),
+    Median = median(PESO, na.rm = TRUE),
+    Mean = mean(PESO, na.rm = TRUE),
+    SD = sd(PESO, na.rm = TRUE),
+    `3er Q` = quantile(PESO, 0.75, na.rm = TRUE),
+    Max = max(PESO, na.rm = TRUE)
+  )
+# Mostrar el resumen estadístico
+print(resumen_peso)
+# Crear un histograma separado por género usando facet_wrap
+ggplot(Medicamentos, aes(x = PESO, fill = SEXO)) +
+  geom_histogram(binwidth = 0.1, color = "black", alpha = 0.7) +
+  facet_wrap(~ SEXO) +
+  labs(title = "Distribución del Peso de los Recién Nacidos por Género",
+       x = "Peso (kg)",
+       y = "Frecuencia") +
+  scale_fill_manual(values = c("FEMENINO" = "lightpink", "MASCULINO" = "lightblue")) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título# Crear un boxplot para la variable PESO
+# Crear un histograma separado por género
+ggplot(Medicamentos, aes(x = PESO, fill = SEXO)) +
+  geom_histogram(binwidth = 0.1, color = "black", alpha = 0.7, position = "dodge") +
+  labs(title = "Distribución del Peso de los Recién Nacidos por Género",
+       x = "Peso (kg)",
+       y = "Frecuencia") +
+  scale_fill_manual(values = c("FEMENINO" = "lightpink", "MASCULINO" = "lightblue")) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+# Crear un boxplot separado por género
+ggplot(Medicamentos, aes(x = SEXO, y = PESO, fill = SEXO)) +
+  geom_boxplot(color = "black", alpha = 0.7) +
+  labs(title = "Boxplot del Peso de los Recién Nacidos por Género",
+       x = "Sexo",
+       y = "Peso (kg)") +
+  scale_fill_manual(values = c("FEMENINO" = "lightpink", "MASCULINO" = "lightblue")) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+```
+
+## 5.7. DEPARTAMENTO
+
+El análisis de la distribución de registros por departamento revela que Lima concentra la mayor cantidad de registros con 284,662, seguido por La Libertad, Cajamarca, y Cusco, que tienen entre 73,592 y 80,447 registros. Esta concentración en Lima es esperada dada su alta población y la centralización de los servicios de salud en la capital. Por otro lado, departamentos como Moquegua, Madre de Dios, y Tacna presentan los menores números de registros, con menos de 8,000 casos cada uno, lo que podría reflejar una menor población o acceso limitado a servicios de salud en estas regiones. Estos datos se visualizan en gráficos de barras, que destacan tanto los departamentos con más como con menos registros.
+
+```{r}
+# Contar la cantidad de registros por departamento
+frecuencia_departamento <- Medicamentos %>%
+  group_by(DEPARTAMENTO) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar los primeros 10 departamentos más frecuentes
+top_departamentos <- head(frecuencia_departamento, 10)
+print(top_departamentos)
+# Crear un gráfico de barras para la cantidad de registros por departamento
+ggplot(frecuencia_departamento, aes(x = reorder(DEPARTAMENTO, -Count), y = Count, fill = DEPARTAMENTO)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Departamento",
+       x = "Departamento",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        axis.text.x = element_text(angle = 45, hjust = 1),  # Rotar etiquetas del eje x para mejor legibilidad
+        legend.position = "none")  # Eliminar la leyenda
+# Agrupar por departamento y contar la cantidad de registros
+departamentos_menos_registros <- Medicamentos %>%
+  group_by(DEPARTAMENTO) %>%
+  summarise(Cantidad_Usos = n()) %>%
+  arrange(Cantidad_Usos) %>%
+  head(10)
+# Mostrar los 10 departamentos con menos registros
+print(departamentos_menos_registros)
+# Visualización de los 10 departamentos con menos registros con un gráfico de barras
+ggplot(departamentos_menos_registros, aes(x = reorder(DEPARTAMENTO, Cantidad_Usos), y = Cantidad_Usos, fill = DEPARTAMENTO)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Top 10 Departamentos con Menos Registros",
+       x = "Departamento",
+       y = "Cantidad de Usos") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        axis.text.x = element_text(angle = 45, hjust = 1),  # Rotar las etiquetas del eje x para mejor legibilidad
+        legend.position = "none") +  # Eliminar la leyenda
+  scale_fill_manual(values = scales::hue_pal()(nrow(departamentos_menos_registros)))  # Usar la misma paleta de colores que en provincias
+```
+
+## 5.8. PROVINCIA
+
+En cuanto a la distribución por provincia, la ciudad de Lima lidera con 83,743 registros, seguida por Trujillo, San Juan de Miraflores, y Cajamarca, que registran entre 26,721 y 32,926 casos. Estas cifras reflejan la alta demanda de atención en áreas urbanas y densamente pobladas. En contraste, provincias como Ocros y Canta, con tan solo 3 y 5 registros respectivamente, se encuentran en el extremo opuesto, lo que podría indicar áreas con menor cobertura de servicios de salud o baja densidad poblacional. La distribución de registros por provincia se presenta en gráficos de barras que ilustran tanto los valores más altos como los más bajos.
+
+```{r}
+# Contar la cantidad de registros por provincia
+frecuencia_provincia <- Medicamentos %>%
+  group_by(PROVINCIA) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Seleccionar el top 10 provincias más frecuentes
+top_provincias <- frecuencia_provincia %>%
+  top_n(10, Count)
+# Crear un gráfico de barras para la cantidad de registros por provincia (Top 10)
+ggplot(top_provincias, aes(x = reorder(PROVINCIA, -Count), y = Count, fill = PROVINCIA)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Provincia (Top 10)",
+       x = "Provincia",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        axis.text.x = element_text(angle = 45, hjust = 1),  # Rotar etiquetas del eje x para mejor legibilidad
+        legend.position = "none")  # Eliminar la leyenda
+# Agrupar por provincia y contar la cantidad de registros
+provincias_menos_registros <- Medicamentos %>%
+  group_by(PROVINCIA) %>%
+  summarise(Cantidad_Usos = n()) %>%
+  arrange(Cantidad_Usos) %>%
+  head(10)
+# Mostrar las 10 provincias con menos registros
+print(provincias_menos_registros)
+# Visualización de las 10 provincias con menos registros con una paleta de colores normal
+ggplot(provincias_menos_registros, aes(x = reorder(PROVINCIA, Cantidad_Usos), y = Cantidad_Usos, fill = PROVINCIA)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Provincia con menos registros",
+       x = "Provincia",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        axis.text.x = element_text(angle = 45, hjust = 1),  # Rotar etiquetas del eje x para mejor legibilidad
+        legend.position = "none")  # Eliminar la leyenda
+```
+
+## 5.9. DISTRITO
+
+El análisis por distrito muestra que Lima es nuevamente el distrito con el mayor número de registros, con 83,743 casos, seguido por Trujillo y San Juan de Miraflores. Estos resultados destacan la importancia de estos distritos como centros de atención médica. Por otro lado, varios distritos, como Acos Vinchos y Capachica, tienen solo un registro, lo que podría reflejar la limitada cobertura de datos o menor acceso a servicios de salud en estas áreas. Para visualizar esta información, se han creado gráficos de barras que destacan tanto los distritos con más como con menos registros.
+
+```{r}
+# Contar la cantidad de registros por distrito
+frecuencia_distrito <- Medicamentos %>%
+  group_by(DISTRITO) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar los primeros 10 distritos más frecuentes
+top_distritos <- head(frecuencia_distrito, 10)
+print(top_distritos)
+# Seleccionar el top 10 distritos más frecuentes
+top_distritos <- frecuencia_distrito %>%
+  top_n(10, Count)
+# Crear un gráfico de barras para la cantidad de registros por distrito (Top 10)
+ggplot(top_distritos, aes(x = reorder(DISTRITO, -Count), y = Count, fill = DISTRITO)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Distrito (Top 10)",
+       x = "Distrito",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        axis.text.x = element_text(angle = 45, hjust = 1),  # Rotar etiquetas del eje x para mejor legibilidad
+        legend.position = "none")  # Eliminar la leyenda
+# Agrupar por distrito y contar la cantidad de registros
+distritos_menos_registros <- Medicamentos %>%
+  group_by(DISTRITO) %>%
+  summarise(Cantidad_Usos = n()) %>%
+  arrange(Cantidad_Usos) %>%
+  head(10)
+# Mostrar los 10 distritos con menos registros
+print(distritos_menos_registros)
+# Visualización de los 10 distritos con menos registros manteniendo los colores del gráfico de provincias
+ggplot(distritos_menos_registros, aes(x = reorder(DISTRITO, Cantidad_Usos), y = Cantidad_Usos, fill = DISTRITO)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Top 10 Distritos con Menos Registros",
+       x = "Distrito",
+       y = "Cantidad de Usos") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        axis.text.x = element_text(angle = 45, hjust = 1),  # Rotar las etiquetas del eje x para mejor legibilidad
+        legend.position = "none") +  # Eliminar la leyenda
+  scale_fill_manual(values = scales::hue_pal()(nrow(distritos_menos_registros)))  # Usar la misma paleta de colores que en provincias
+```
+
+## 5.10. UBIGEO
+
+El código UBIGEO, que identifica de manera única a las localidades geográficas en Perú, muestra que el distrito de Lima (código 150101) tiene el mayor número de registros, seguido por Trujillo (130101) y San Juan de Miraflores (150133). Estos datos refuerzan los hallazgos anteriores sobre la concentración de atención médica en estas áreas. El gráfico de barras correspondiente visualiza los 10 códigos UBIGEO más frecuentes, permitiendo una rápida identificación de las áreas con mayor actividad en el sistema de salud.
+
+```{r}
+# Contar la cantidad de registros por UBIGEO
+frecuencia_ubigeo <- Medicamentos %>%
+  group_by(UBIGEO) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar los primeros 10 UBIGEO más frecuentes
+top_ubigeo <- head(frecuencia_ubigeo, 10)
+print(top_ubigeo)
+# Seleccionar el top 10 UBIGEO más frecuentes
+top_ubigeo <- frecuencia_ubigeo %>%
+  top_n(10, Count)
+# Crear un gráfico de barras para la cantidad de registros por UBIGEO (Top 10)
+ggplot(top_ubigeo, aes(x = reorder(UBIGEO, -Count), y = Count, fill = UBIGEO)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por UBIGEO (Top 10)",
+       x = "UBIGEO",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        axis.text.x = element_text(angle = 45, hjust = 1),  # Rotar etiquetas del eje x para mejor legibilidad
+        legend.position = "none")  # Eliminar la leyenda
+```
+
+## 5.11. NIVEL_EESS
+
+La clasificación de los registros por nivel de complejidad del establecimiento de salud revela que los establecimientos de nivel 3 son los más representados, con 652,948 registros, seguidos por los de nivel 4 y nivel 2, con 310,272 y 277,385 registros respectivamente. Esto sugiere que una gran proporción de la atención se lleva a cabo en establecimientos con una alta capacidad de resolución, lo cual es crucial para la atención neonatal. El gráfico de barras correspondiente ilustra esta distribución, subrayando la predominancia de los centros de salud de nivel 3.
+
+```{r}
+# Contar la cantidad de registros por NIVEL_EESS
+frecuencia_nivel <- Medicamentos %>%
+  group_by(NIVEL_EESS) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar los niveles más frecuentes
+print(frecuencia_nivel)
+# Crear un gráfico de barras para la cantidad de registros por NIVEL_EESS
+ggplot(frecuencia_nivel, aes(x = reorder(NIVEL_EESS, -Count), y = Count, fill = NIVEL_EESS)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Nivel de Complejidad del Establecimiento de Salud",
+       x = "Nivel de Establecimiento de Salud",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+```
+
+## 5.12. RENIPRESS
+
+El código RENIPRESS, que identifica de manera única a cada establecimiento de salud en Perú, muestra que el "Instituto Nacional Materno Perinatal" tiene la mayor cantidad de registros, con 49,665 casos. Otros hospitales importantes, como el "Hospital María Auxiliadora" y el "Hospital Regional Docente Materno Infantil El Carmen", también están entre los más representados. Esto indica que estas instituciones son puntos clave para la atención neonatal en el país. El gráfico de barras correspondiente visualiza los 10 códigos RENIPRESS más frecuentes, destacando a los principales establecimientos de salud en el manejo de estos casos.
+
+```{r}
+# Contar la cantidad de registros por código RENIPRESS
+frecuencia_renipress <- Medicamentos %>%
+  group_by(RENIPRESS) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar los primeros 10 códigos RENIPRESS más frecuentes
+top_renipress <- head(frecuencia_renipress, 10)
+print(top_renipress)
+# Crear un gráfico de barras para la cantidad de registros por código RENIPRESS (Top 10)
+ggplot(top_renipress, aes(x = reorder(RENIPRESS, -Count), y = Count, fill = RENIPRESS)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Código RENIPRESS (Top 10)",
+       x = "Código RENIPRESS",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")  # Rotar etiquetas del eje x para mejor legibilidad
+```
+
+## 5.13. NOMBRE_EESS
+
+Al analizar la distribución de registros por nombre del establecimiento de salud, se observa que el "Instituto Nacional Materno Perinatal" encabeza la lista, lo que refuerza su rol como líder en la atención materno-infantil en Perú. Otros hospitales importantes, como el "Hospital María Auxiliadora" y el "Hospital Nacional Cayetano Heredia", también muestran un alto volumen de atención. Este análisis se presenta en un gráfico de barras horizontal, que facilita la comparación directa entre los 10 establecimientos más frecuentemente registrados.
+
+```{r}
+# Contar la cantidad de registros por nombre de establecimiento de salud
+frecuencia_nombre_eess <- Medicamentos %>%
+  group_by(NOMBRE_EESS) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar los primeros 10 nombres de establecimientos de salud más frecuentes
+top_nombre_eess <- head(frecuencia_nombre_eess, 10)
+print(top_nombre_eess)
+# Crear un gráfico de barras horizontal para la cantidad de registros por nombre de establecimiento de salud (Top 10)
+ggplot(top_nombre_eess, aes(x = reorder(NOMBRE_EESS, Count), y = Count, fill = NOMBRE_EESS)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Nombre de Establecimiento de Salud (Top 10)",
+       x = "Nombre del Establecimiento de Salud",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        legend.position = "none") +  # Eliminar la leyenda
+  coord_flip()  # Girar el gráfico de barras para que sea horizontal
+```
+
+## 5.14. COD_SERVICIO
+
+El análisis de los códigos de servicio revela que el código 050, correspondiente a la "Atención Inmediata del Recién Nacido Normal", es el más común, representando 693,737 registros. Esto indica que la mayoría de los registros están asociados con nacimientos sin complicaciones que requieren atención estándar. Otros códigos significativos incluyen 051, que corresponde al "Internamiento del Recién Nacido con Patología No Quirúrgica" y el 068, relacionado con "Internamiento en la Unidad de Cuidados Intensivos", mostrando la variedad de servicios brindados a recién nacidos. Estos hallazgos se presentan en un gráfico de barras que muestra los códigos de servicio más frecuentes.
+
+```{r}
+# Contar la cantidad de registros por código de servicio
+frecuencia_cod_servicio <- Medicamentos %>%
+  group_by(COD_SERVICIO) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar los primeros 10 códigos de servicio más frecuentes
+top_cod_servicio <- head(frecuencia_cod_servicio, 10)
+print(top_cod_servicio)
+# Crear un gráfico de barras vertical para la cantidad de registros por código de servicio (Top 10)
+ggplot(top_cod_servicio, aes(x = reorder(COD_SERVICIO, -Count), y = Count, fill = COD_SERVICIO)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Código de Servicio (Top 10)",
+       x = "Código de Servicio",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        legend.position = "none")  # Eliminar la leyenda
+```
+
+## 5.15. SERVICIO
+
+En cuanto a los servicios específicos brindados, la "Atención Inmediata del Recién Nacido Normal" es nuevamente el más representado, seguido por "Internamiento del Recién Nacido con Patología No Quirúrgica". Estos servicios reflejan los tipos de cuidados más comunes en las unidades neonatales, desde la atención de rutina hasta el manejo de patologías no quirúrgicas. Servicios más especializados como "Internamiento con Estancia en la Unidad de Cuidados Intensivos" y "Atención por Emergencia" también están presentes, pero en menor número. El gráfico de barras horizontal ilustra la distribución de los registros por tipo de servicio de salud.
+
+```{r}
+# Contar la cantidad de registros por nombre de servicio
+frecuencia_servicio <- Medicamentos %>%
+  group_by(SERVICIO) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar los primeros 10 nombres de servicios más frecuentes
+top_servicios <- head(frecuencia_servicio, 10)
+print(top_servicios)
+# Crear un gráfico de barras horizontal para la cantidad de registros por nombre de servicio (Top 10)
+ggplot(top_servicios, aes(x = reorder(SERVICIO, Count), y = Count, fill = SERVICIO)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Servicio de Salud (Top 10)",
+       x = "Servicio de Salud",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        legend.position = "none") +  # Eliminar la leyenda
+  coord_flip()  # Girar el gráfico de barras para que sea horizontal
+```
+
+## 5.16. FECINGHOSP
+
+El análisis de la variable FECINGHOSP, que registra la fecha de ingreso al hospital, muestra que los ingresos hospitalarios se distribuyen a lo largo del tiempo, con un aumento notable en ciertos períodos. El rango de fechas va desde el 7 de diciembre de 2021 hasta el 30 de septiembre de 2023, con una mediana de ingresos el 6 de noviembre de 2022. Estos datos sugieren una constante demanda de hospitalización para recién nacidos en este período. La distribución de los ingresos a lo largo del tiempo se presenta en un gráfico de líneas, destacando los momentos con mayor afluencia hospitalaria.
+
+```{r}
+# Contar la cantidad de registros por fecha de ingreso al hospital
+registros_por_fecha_ingreso <- Medicamentos %>%
+  group_by(FECINGHOSP) %>%
+  summarise(Count = n()) %>%
+  arrange(FECINGHOSP)
+# Mostrar un resumen estadístico de la variable FECINGHOSP
+resumen_fecinghosp <- summary(Medicamentos$FECINGHOSP)
+print(resumen_fecinghosp)
+# Crear un gráfico de líneas para la cantidad de registros por fecha de ingreso al hospital
+ggplot(registros_por_fecha_ingreso, aes(x = FECINGHOSP, y = Count)) +
+  geom_line(color = "blue") +
+  labs(title = "Distribución de Registros por Fecha de Ingreso al Hospital",
+       x = "Fecha de Ingreso al Hospital",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+```
+
+## 5.17. FECALTAHOSP
+
+La variable FECALTAHOSP, que registra la fecha de alta hospitalaria, tiene un patrón similar al de la fecha de ingreso, con registros que van desde el 1 de enero de 2022 hasta el 30 de septiembre de 2023. La mediana de las altas hospitalarias es el 10 de noviembre de 2022, lo que indica que las hospitalizaciones y altas siguen un curso paralelo a lo largo del tiempo. Este análisis sugiere que la duración de la estancia hospitalaria es generalmente corta, reflejando un manejo eficiente de los casos. El gráfico de líneas muestra la distribución de las altas a lo largo del tiempo.
+
+```{r}
+# Contar la cantidad de registros por fecha de alta hospitalaria
+registros_por_fecha_alta <- Medicamentos %>%
+  group_by(FECALTAHOSP) %>%
+  summarise(Count = n()) %>%
+  arrange(FECALTAHOSP)
+# Mostrar un resumen estadístico de la variable FECALTAHOSP
+resumen_fecaltahosp <- summary(Medicamentos$FECALTAHOSP)
+print(resumen_fecaltahosp)
+# Crear un gráfico de líneas para la cantidad de registros por fecha de alta hospitalaria
+ggplot(registros_por_fecha_alta, aes(x = FECALTAHOSP, y = Count)) +
+  geom_line(color = "blue") +
+  labs(title = "Distribución de Registros por Fecha de Alta Hospitalaria",
+       x = "Fecha de Alta Hospitalaria",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+```
+
+## 5.18. DIAS_HOSP
+
+El análisis de la duración de la hospitalización muestra que la mayoría de los recién nacidos permanecen hospitalizados por un período corto, con una mediana de 1 día y una media de aproximadamente 3.46 días. La desviación estándar es de 5.25 días, lo que indica variabilidad en las estancias hospitalarias, dependiendo de la complejidad de los casos. Las hospitalizaciones más prolongadas alcanzan hasta 35 días. La distribución de los días de hospitalización se visualiza a través de histogramas y diagramas de caja (boxplots), tanto por sexo como por nivel de establecimiento de salud, destacando cómo varían estos tiempos según diferentes factores.
+
+```{r}
+# Resumen estadístico de la variable DIAS_HOSP
+resumen_dias_hosp <- summary(Medicamentos$DIAS_HOSP)
+print(resumen_dias_hosp)
+# Calcular la desviación estándar de DIAS_HOSP
+desviacion_dias_hosp <- sd(Medicamentos$DIAS_HOSP, na.rm = TRUE)
+print(paste("Desviación Estándar de DIAS_HOSP:", desviacion_dias_hosp))
+# Histograma de DIAS_HOSP separado por SEXO
+ggplot(Medicamentos, aes(x = DIAS_HOSP, fill = SEXO)) +
+  geom_histogram(binwidth = 1, color = "black", alpha = 0.7, position = "dodge") +
+  labs(title = "Distribución de los Días de Hospitalización por Sexo",
+       x = "Días de Hospitalización",
+       y = "Frecuencia") +
+  scale_fill_manual(values = c("FEMENINO" = "lightpink", "MASCULINO" = "lightblue")) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+# Boxplot de DIAS_HOSP separado por SEXO
+ggplot(Medicamentos, aes(x = SEXO, y = DIAS_HOSP, fill = SEXO)) +
+  geom_boxplot() +
+  labs(title = "Días de Hospitalización Separados por Sexo",
+       x = "Sexo",
+       y = "Días de Hospitalización") +
+  scale_fill_manual(values = c("FEMENINO" = "lightpink", "MASCULINO" = "lightblue")) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+# Boxplot de DIAS_HOSP separado por NIVEL_EESS
+ggplot(Medicamentos, aes(x = NIVEL_EESS, y = DIAS_HOSP, fill = NIVEL_EESS)) +
+  geom_boxplot() +
+  labs(title = "Días de Hospitalización por Nivel de Establecimiento de Salud",
+       x = "Nivel de Establecimiento de Salud",
+       y = "Días de Hospitalización") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+# Boxplot de DIAS_HOSP separado por DEPARTAMENTO sin leyenda
+ggplot(Medicamentos, aes(x = DEPARTAMENTO, y = DIAS_HOSP, fill = DEPARTAMENTO)) +
+  geom_boxplot() +
+  labs(title = "Días de Hospitalización por Departamento",
+       x = "Departamento",
+       y = "Días de Hospitalización") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        axis.text.x = element_text(angle = 45, hjust = 1),  # Rotar etiquetas del eje x para mejor legibilidad
+        legend.position = "none")  # Eliminar la leyenda
+# Histograma de DIAS_HOSP separado por DEPARTAMENTO sin leyenda
+ggplot(Medicamentos, aes(x = DIAS_HOSP, fill = DEPARTAMENTO)) +
+  geom_histogram(binwidth = 1, color = "black", alpha = 0.7, position = "dodge") +
+  facet_wrap(~ DEPARTAMENTO) +
+  labs(title = "Distribución de Días de Hospitalización por Departamento",
+       x = "Días de Hospitalización",
+       y = "Frecuencia") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        legend.position = "none")  # Eliminar la leyenda
+```
+
+## 5.19. CODDIA
+
+La variable CODDIA, que corresponde al código CIE-10 del diagnóstico principal, revela que los códigos más comunes son Z380 ("Producto Único Nacido en el Hospital") y Z370 ("Nacido Vivo Único"), con 423,001 y 391,560 registros respectivamente. Estos códigos reflejan diagnósticos rutinarios asociados con nacimientos sin complicaciones. Otros códigos, como P369 ("Sepsis Bacteriana del Recién Nacido No Especificada") y P073 ("Otros Recién Nacidos Pretermino"), indican casos más complejos que requieren atención médica especializada. La distribución de los diagnósticos se presenta en un gráfico de barras que muestra los 10 códigos CIE-10 más frecuentes.
+
+```{r}
+# Contar la cantidad de registros por código CIE-10 (CODDIA)
+frecuencia_coddia <- Medicamentos %>%
+  group_by(CODDIA) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar los primeros 10 códigos CIE-10 más frecuentes
+top_coddia <- head(frecuencia_coddia, 10)
+print(top_coddia)
+# Crear un gráfico de barras vertical para la cantidad de registros por código CIE-10 (Top 10)
+ggplot(top_coddia, aes(x = reorder(CODDIA, -Count), y = Count, fill = CODDIA)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Código CIE-10 (Top 10)",
+       x = "Código CIE-10",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        legend.position = "none")  # Eliminar la leyenda
+```
+
+## 5.20. C10_NOMBRE
+
+El análisis de la variable C10_NOMBRE, que describe el diagnóstico principal, reafirma que "Producto Único Nacido en el Hospital" es el diagnóstico más común, seguido por "Nacido Vivo Único" y "Sepsis Bacteriana del Recién Nacido No Especificada". Estos datos reflejan los principales motivos de atención en las unidades neonatales, con un énfasis en la atención de nacimientos normales, pero también destacando la presencia de infecciones neonatales. El gráfico de barras horizontal permite visualizar claramente la frecuencia de los principales diagnósticos en la atención neonatal.
+
+```{r}
+# Contar la cantidad de registros por nombre de diagnóstico (C10_NOMBRE)
+frecuencia_c10_nombre <- Medicamentos %>%
+  group_by(C10_NOMBRE) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar los primeros 10 nombres de diagnóstico más frecuentes
+top_c10_nombre <- head(frecuencia_c10_nombre, 10)
+print(top_c10_nombre)
+# Crear un gráfico de barras horizontal para la cantidad de registros por nombre de diagnóstico (Top 10)
+ggplot(top_c10_nombre, aes(x = reorder(C10_NOMBRE, Count), y = Count, fill = C10_NOMBRE)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Diagnóstico Principal (Top 10)",
+       x = "Diagnóstico Principal",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        legend.position = "none") +  # Eliminar la leyenda
+  coord_flip()  # Girar el gráfico de barras para que sea horizontal
+```
+
+## 5.21. COD_MEDICAMENTO
+
+El análisis de los códigos de medicamentos muestra que el código 03576 es el más frecuente, con 499,804 registros, seguido por el código 06111, con 307,052 registros. Estos códigos representan los medicamentos más comúnmente administrados en los establecimientos de salud. La lista incluye otros medicamentos que, aunque menos frecuentes, siguen siendo significativos en términos de su uso. El gráfico de barras muestra la distribución de los 10 códigos de medicamentos más comunes.
+
+```{r}
+# Contar la cantidad de registros por código de medicamento
+frecuencia_cod_medicamento <- Medicamentos %>%
+  group_by(COD_MEDICAMENTO) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar los primeros 10 códigos de medicamento más frecuentes
+top_cod_medicamento <- head(frecuencia_cod_medicamento, 10)
+print(top_cod_medicamento)
+# Crear un gráfico de barras vertical para la cantidad de registros por código de medicamento (Top 10)
+ggplot(top_cod_medicamento, aes(x = reorder(COD_MEDICAMENTO, -Count), y = Count, fill = COD_MEDICAMENTO)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Código de Medicamento (Top 10)",
+       x = "Código de Medicamento",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        legend.position = "none")  # Eliminar la leyenda
+```
+
+## 5.22. NOMBRE_MEDICAMENTO
+
+En términos de nombres de medicamentos, la **Fitomenadiona** es el medicamento más registrado, con 499,811 usos. Esto sugiere su alta demanda y uso en tratamientos neonatales, probablemente debido a su uso en la prevención y tratamiento de la enfermedad hemorrágica del recién nacido. Otros medicamentos frecuentes incluyen **Tetraciclina Clorhidrato** y **Sodio Cloruro**, que son esenciales en el manejo de infecciones y equilibrio de electrolitos. El gráfico de barras horizontal ilustra la distribución de los registros por los nombres de medicamentos más comunes.
+
+```{r}
+# Contar la cantidad de registros por nombre de medicamento
+frecuencia_nombre_medicamento <- Medicamentos %>%
+  group_by(NOMBRE_MEDICAMENTO) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar los primeros 10 nombres de medicamentos más frecuentes
+top_nombre_medicamento <- head(frecuencia_nombre_medicamento, 10)
+print(top_nombre_medicamento)
+# Crear un gráfico de barras horizontal para la cantidad de registros por nombre de medicamento (Top 10)
+ggplot(top_nombre_medicamento, aes(x = reorder(NOMBRE_MEDICAMENTO, Count), y = Count, fill = NOMBRE_MEDICAMENTO)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Nombre de Medicamento (Top 10)",
+       x = "Nombre del Medicamento",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        legend.position = "none") +  # Eliminar la leyenda
+  coord_flip()  # Girar el gráfico de barras para que sea horizontal
+```
+
+## 5.23. PRESENTACION
+
+La presentación más frecuente de medicamentos es la de **1 mL**, con 556,279 registros, seguida de **6 g**, con 307,053 registros. Estas presentaciones reflejan las dosis comúnmente administradas a los recién nacidos, indicando una preferencia por volúmenes pequeños y precisos en la administración de medicamentos. El gráfico de barras vertical permite visualizar las 10 presentaciones de medicamentos más comunes en el conjunto de datos.
+
+```{r}
+# Contar la cantidad de registros por presentación de medicamento
+frecuencia_presentacion <- Medicamentos %>%
+  group_by(PRESENTACION) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar las 10 presentaciones más frecuentes
+top_presentacion <- head(frecuencia_presentacion, 10)
+print(top_presentacion)
+# Crear un gráfico de barras vertical para la cantidad de registros por presentación de medicamento (Top 10)
+ggplot(top_presentacion, aes(x = reorder(PRESENTACION, -Count), y = Count, fill = PRESENTACION)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Presentación de Medicamento (Top 10)",
+       x = "Presentación del Medicamento",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        legend.position = "none")  # Eliminar la leyenda
+```
+
+## 5.24. FORMA_FARMACEUTICA
+
+La **forma farmacéutica** más frecuente es la **inyectable (INY)**, con 826,740 registros, lo que subraya la prevalencia de los medicamentos administrados por vía inyectable en el tratamiento neonatal. Otras formas, como **Ungüento Oftálmico (UNG_OFT)** y **Solución Oftálmica (SOL_OFT)**, también son comunes, reflejando las necesidades de cuidado ocular en recién nacidos. El gráfico de barras vertical muestra la distribución de las 10 formas farmacéuticas más utilizadas.
+
+```{r}
+# Contar la cantidad de registros por forma farmacéutica
+frecuencia_forma_farmaceutica <- Medicamentos %>%
+  group_by(FORMA_FARMACEUTICA) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+# Mostrar las 10 formas farmacéuticas más frecuentes
+top_forma_farmaceutica <- head(frecuencia_forma_farmaceutica, 10)
+print(top_forma_farmaceutica)
+# Crear un gráfico de barras vertical para la cantidad de registros por forma farmacéutica (Top 10)
+ggplot(top_forma_farmaceutica, aes(x = reorder(FORMA_FARMACEUTICA, -Count), y = Count, fill = FORMA_FARMACEUTICA)) +
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Distribución de Registros por Forma Farmacéutica (Top 10)",
+       x = "Forma Farmacéutica",
+       y = "Cantidad de Registros") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        legend.position = "none")  # Eliminar la leyenda
+```
+
+## 5.25. CANTIDAD
+
+El análisis de la **cantidad de medicamento administrado** muestra que la mayoría de los registros corresponden a una única unidad de medicamento, con una mediana de 1 y una media ligeramente superior a 1 (1.403). La distribución tiene una desviación estándar de 1.18, lo que indica una variabilidad limitada en las dosis administradas. Este comportamiento se muestra en un histograma, que también presenta las diferencias de distribución por sexo.
+
+```{r}
+# Resumen estadístico de la variable CANTIDAD
+resumen_cantidad <- summary(Medicamentos$CANTIDAD)
+print(resumen_cantidad)
+
+# Calcular la desviación estándar de la variable CANTIDAD
+desviacion_cantidad <- sd(Medicamentos$CANTIDAD, na.rm = TRUE)
+print(paste("Desviación Estándar de CANTIDAD:", desviacion_cantidad))
+# Histograma de CANTIDAD separado por SEXO
+ggplot(Medicamentos, aes(x = CANTIDAD, fill = SEXO)) +
+  geom_histogram(binwidth = 1, color = "black", alpha = 0.7, position = "dodge") +
+  labs(title = "Distribución de la Cantidad de Medicamento Administrado por Sexo",
+       x = "Cantidad",
+       y = "Frecuencia") +
+  scale_fill_manual(values = c("FEMENINO" = "lightpink", "MASCULINO" = "lightblue")) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+```
+
+## 5.26. VALOR_BRUTO
+
+El **valor bruto** de los medicamentos administrados tiene una mediana de 0.69 soles y una media de 2.14 soles, con una desviación estándar de 3.78 soles. Esto indica que la mayoría de los medicamentos tienen un valor relativamente bajo, aunque hay algunos casos con valores más altos, hasta un máximo de 17.213 soles. Los histogramas muestran cómo se distribuye este valor por sexo y por departamento, revelando variaciones significativas en los costos asociados con la administración de medicamentos.
+
+```{r}
+# Resumen estadístico de la variable VALOR_BRUTO
+resumen_valor_bruto <- summary(Medicamentos$VALOR_BRUTO)
+print(resumen_valor_bruto)
+# Calcular la desviación estándar de la variable VALOR_BRUTO
+desviacion_valor_bruto <- sd(Medicamentos$VALOR_BRUTO, na.rm = TRUE)
+print(paste("Desviación Estándar de VALOR_BRUTO:", desviacion_valor_bruto))
+# Histograma de VALOR_BRUTO separado por SEXO
+ggplot(Medicamentos, aes(x = VALOR_BRUTO, fill = SEXO)) +
+  geom_histogram(binwidth = 10, color = "black", alpha = 0.7, position = "dodge") +
+  labs(title = "Distribución del Valor Bruto de Medicamento por Sexo",
+       x = "Valor Bruto (Soles)",
+       y = "Frecuencia") +
+  scale_fill_manual(values = c("FEMENINO" = "lightpink", "MASCULINO" = "lightblue")) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+# Histograma de VALOR_BRUTO separado por DEPARTAMENTO
+ggplot(Medicamentos, aes(x = VALOR_BRUTO, fill = DEPARTAMENTO)) +
+  geom_histogram(binwidth = 10, color = "black", alpha = 0.7, position = "dodge") +
+  facet_wrap(~ DEPARTAMENTO, scales = "free_y") +
+  labs(title = "Distribución del Valor Bruto de Medicamento por Departamento",
+       x = "Valor Bruto (Soles)",
+       y = "Frecuencia") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        axis.text.x = element_text(angle = 45, hjust = 1),  # Rotar etiquetas del eje x para mejor legibilidad
+        legend.position = "none")  # Eliminar la leyenda
+```
+
+## 5.27. VALOR_NETO
+
+El **valor neto** de los medicamentos, tras aplicar posibles descuentos u otras consideraciones, presenta una mediana de 0.4 soles y una media de 1.93 soles, con una desviación estándar de 3.59 soles. Al igual que con el valor bruto, la mayoría de los medicamentos tienen un costo bajo, pero existen valores más altos que llegan hasta 16.5 soles. Los gráficos muestran la distribución del valor neto tanto por sexo como por departamento, proporcionando una visión detallada de las variaciones en los costos de los medicamentos.
+
+```{r}
+# Resumen estadístico de la variable VALOR_NETO
+resumen_valor_neto <- summary(Medicamentos$VALOR_NETO)
+print(resumen_valor_neto)
+# Calcular la desviación estándar de la variable VALOR_NETO
+desviacion_valor_neto <- sd(Medicamentos$VALOR_NETO, na.rm = TRUE)
+print(paste("Desviación Estándar de VALOR_NETO:", desviacion_valor_neto))
+# Histograma de VALOR_NETO separado por SEXO
+ggplot(Medicamentos, aes(x = VALOR_NETO, fill = SEXO)) +
+  geom_histogram(binwidth = 10, color = "black", alpha = 0.7, position = "dodge") +
+  labs(title = "Distribución del Valor Neto de Medicamento por Sexo",
+       x = "Valor Neto (Soles)",
+       y = "Frecuencia") +
+  scale_fill_manual(values = c("FEMENINO" = "lightpink", "MASCULINO" = "lightblue")) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Centrar el título
+# Histograma de VALOR_NETO separado por DEPARTAMENTO
+ggplot(Medicamentos, aes(x = VALOR_NETO, fill = DEPARTAMENTO)) +
+  geom_histogram(binwidth = 10, color = "black", alpha = 0.7, position = "dodge") +
+  facet_wrap(~ DEPARTAMENTO, scales = "free_y") +
+  labs(title = "Distribución del Valor Neto de Medicamento por Departamento",
+       x = "Valor Neto (Soles)",
+       y = "Frecuencia") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  # Centrar el título
+        axis.text.x = element_text(angle = 45, hjust = 1),  # Rotar etiquetas del eje x para mejor legibilidad
+        legend.position = "none")  # Eliminar la leyenda
+```
+
+# 6. Análisis
+
+## 6.1. Análisis Geográfico
+
+Este mapa muestra la distribución de los registros de atención de salud en los diferentes departamentos del Perú. Cada departamento está coloreado según la cantidad de registros, con un gradiente de color que va desde los departamentos con menor cantidad de registros (colores más claros) hasta aquellos con mayor cantidad de registros (colores más oscuros). Esto permite identificar visualmente las áreas con mayor actividad médica, destacando regiones como Lima, que suele concentrar una gran parte de los servicios de salud.
+
+```{r}
+# Distribución de Registros por Departamento
+# Suponiendo que ya tienes el shapefile de Perú y los datos de registros unidos
+# Descargar el shapefile del Perú usando geodata
+peru_shapefile <- gadm("Peru", level = 1, path = tempdir())
+# Contar la cantidad de registros por departamento
+registros_departamento <- Medicamentos %>%
+  count(DEPARTAMENTO) %>%
+  rename(department = DEPARTAMENTO)
+# Convertir los nombres de los departamentos a minúsculas para garantizar coincidencia
+peru_shapefile$NAME_1 <- tolower(peru_shapefile$NAME_1)
+registros_departamento$department <- tolower(registros_departamento$department)
+# Unir los datos del shapefile con la cantidad de registros
+peru_mapa <- merge(peru_shapefile, registros_departamento, by.x = "NAME_1", by.y = "department", all.x = TRUE)
+# Reemplazar NA con 0 donde no hay registros
+peru_mapa$n[is.na(peru_mapa$n)] <- 0
+# Asegurarse de que el objeto siga siendo un objeto sf
+peru_mapa <- st_as_sf(peru_mapa)
+# Crear el mapa de Perú coloreado por la cantidad de registros por departamento
+ggplot(data = peru_mapa) +
+  geom_sf(aes(fill = n), color = "black") +
+  scale_fill_viridis_c(option = "plasma", na.value = "white") +
+  labs(title = "Distribución de Registros por Departamento en Perú",
+       fill = "Cantidad de Registros") +
+  theme_minimal()
+
+# Departamentos del Perú
+# Descargar el shapefile del Perú usando geodata
+peru_shapefile <- gadm("Peru", level = 1, path = tempdir())
+# Convertir el shapefile en un objeto sf
+peru_mapa <- st_as_sf(peru_shapefile)
+# Crear un mapa de Perú mostrando los departamentos con sus nombres
+ggplot(data = peru_mapa) +
+  geom_sf(fill = "white", color = "black") +  # Relleno blanco y contornos negros
+  geom_sf_text(aes(label = NAME_1), size = 3, color = "black") +  # Añadir los nombres de los departamentos
+  labs(title = "Mapa de los Departamentos de Perú con Nombres") +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),  # Quitar el título del eje x
+    axis.title.y = element_blank(),  # Quitar el título del eje y
+    axis.text.x = element_blank(),   # Quitar las etiquetas del eje x
+    axis.text.y = element_blank(),   # Quitar las etiquetas del eje y
+    axis.ticks = element_blank()     # Quitar las marcas de los ejes
+  )
+```
+
+# 7. Principales hallazgos
+
+-   **Distribución Geográfica**: La mayor parte de los registros de atención de salud se concentra en el departamento de Lima, seguido de otros departamentos como La Libertad, Cajamarca y Cusco. Esto refleja una alta demanda de servicios de salud en las áreas más pobladas y urbanizadas del país.
+
+-   **Servicios de Salud Predominantes**: Los servicios de atención inmediata del recién nacido normal y el internamiento del recién nacido con patología no quirúrgica son los más frecuentes. Esto sugiere una alta incidencia de nacimientos y atención neonatal en los establecimientos de salud.
+
+-   **Diagnósticos Frecuentes**: Los diagnósticos más comunes están relacionados con el nacimiento en el hospital y sepsis bacteriana del recién nacido. Estos resultados indican que la atención perinatal y neonatal son áreas críticas de los servicios de salud en el Perú.
+
+-   **Medicamentos Más Usados**: La Fitomenadiona y la Tetraciclina Clorhidrato son los medicamentos más frecuentemente administrados, lo que apunta a su uso generalizado en los tratamientos perinatales y neonatales.
+
+-   **Variación en la Hospitalización**: La duración de la hospitalización muestra variabilidad considerable, con una media de 3.5 días y una desviación estándar alta. Esto puede indicar diferencias en la gravedad de las condiciones tratadas o en los protocolos de atención.
+
+# 8. Limitaciones
+
+-   **Cobertura de Datos**: La base de datos podría no representar completamente todas las regiones del Perú, especialmente las áreas rurales donde la infraestructura de salud es más limitada. Esto podría sesgar los resultados hacia las zonas más urbanizadas y mejor atendidas.
+
+-   **Calidad de los Datos**: La calidad de los datos depende de la precisión y consistencia en la recolección de información en los establecimientos de salud. Errores en la codificación de diagnósticos, servicios o medicamentos podrían afectar la exactitud de los hallazgos.
+
+-   **Datos Anónimos**: La anonimización de datos es esencial para la privacidad, pero puede limitar la capacidad de realizar análisis detallados a nivel individual o de identificar patrones específicos en subpoblaciones.
+
+-   **Temporalidad de los Datos**: Los datos analizados cubren un período de tiempo limitado. Cambios recientes en políticas de salud o prácticas médicas podrían no estar reflejados en los hallazgos.
+
+# 9. Conclusiones
+
+-   **Concentración en Lima**: La concentración de registros en Lima resalta la centralización de servicios de salud en la capital, lo que puede indicar desigualdades en la accesibilidad a servicios de salud en otras regiones.
+
+-   **Foco en la Atención Neonatal**: La predominancia de diagnósticos y tratamientos relacionados con el recién nacido sugiere la importancia de continuar mejorando la atención perinatal y neonatal en el país.
+
+-   **Variabilidad en la Hospitalización**: Las diferencias significativas en la duración de la hospitalización indican que es necesario estandarizar los protocolos de atención y mejorar el manejo de casos complejos para reducir la variabilidad en los tiempos de hospitalización.
+
+# 10. Recomendaciones
+
+-   **Mejorar la Cobertura y Calidad de Datos**: Se recomienda ampliar la cobertura de la recolección de datos en áreas rurales y garantizar la calidad y consistencia de los datos recolectados en todos los establecimientos de salud.
+
+-   **Descentralización de Servicios**: Fomentar la descentralización de los servicios de salud para mejorar el acceso en regiones fuera de Lima, asegurando que todas las regiones tengan acceso a un nivel adecuado de atención médica.
+
+-   **Fortalecimiento de la Atención Neonatal**: Continuar fortaleciendo los programas de atención perinatal y neonatal, con énfasis en la prevención y tratamiento de condiciones críticas como la sepsis neonatal.
+
+-   **Estandarización de Protocolos**: Desarrollar y estandarizar protocolos de hospitalización para reducir la variabilidad en la duración de las estancias hospitalarias, optimizando los recursos y mejorando los resultados clínicos.
+
+-   **Investigación Continua**: Realizar estudios continuos para monitorear las tendencias de atención de salud, con un enfoque en la evaluación de intervenciones implementadas y la identificación de nuevas áreas de mejora.
